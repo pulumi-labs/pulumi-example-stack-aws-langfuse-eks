@@ -1,0 +1,11 @@
+.venv/
+.artifacts/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+Pulumi.*.yaml
+!Pulumi.yaml
+*.plan
+*.log
+*.state*
+.env*

@@ -1,0 +1,38 @@
+[project]
+name = "langfuse-trace-ingestion-aws"
+version = "0.1.0"
+description = "Private Langfuse tracing on existing EKS"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "pulumi==3.273.0",
+  "pulumi-aws==7.52.1",
+  "pulumi-kubernetes==4.34.2",
+  "pydantic==2.12.4",
+]
+
+# The demo deliberately uses stdlib http.client over a loopback port-forward,
+# with a 15-second timeout, no proxy, no redirects and no additional HTTP SDK.
+# Install exact wheel closures from requirements.lock and test-requirements.lock.
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+include = ["*.py", "tests"]
+exclude = [".venv", ".artifacts"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["COM812", "ISC001", "D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["S101", "D", "PLR2004"]
+
+[tool.pytest.ini_options]
+minversion = "8.4"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]

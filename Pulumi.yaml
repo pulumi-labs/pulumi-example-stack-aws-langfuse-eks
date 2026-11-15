@@ -1,0 +1,6 @@
+name: langfuse-trace-ingestion-aws
+description: Private Langfuse traces on existing EKS with RDS PostgreSQL and S3
+runtime:
+  name: python
+  options:
+    virtualenv: .venv

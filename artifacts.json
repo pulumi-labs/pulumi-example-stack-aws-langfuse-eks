@@ -1,0 +1,124 @@
+{
+  "schema_version": 1,
+  "researched_at": "2026-11-15T18:08:27.952Z",
+  "chart": {
+    "version": "2.2.4",
+    "url": "https://github.com/langfuse/langfuse-k8s/releases/download/langfuse-2.2.4/langfuse-2.2.4.tgz",
+    "sha256": "29e657662e210c0914bfce914d33b61101b890f2d2cda0e871ca8fcaac6fb3f6",
+    "published_at": "2026-11-09T13:07:43Z",
+    "path": ".artifacts/langfuse-2.2.4.tgz",
+    "bundled_dependencies": "postgres1.6.3, valkey0.9.4 and seaweedfs4.23.0 are present in the archive but deploy=false; scan full archive nonetheless"
+  },
+  "images": [
+    {
+      "role": "web",
+      "repository": "docker.langfuse.com/langfuse/langfuse",
+      "version": "4.78.0",
+      "digest": "sha256:129cb76d4cdf6b2be2beaffe5c4b3b8e56af91cdb3e95d47cef0ef73583e7e1d",
+      "index_digest": "sha256:037188385ac6612d3494319fa060052da407b235502874c7ea79ade583c29002",
+      "created_at": "2026-11-10T13:20:28.45565063Z",
+      "source_revision": "138beceb728b998003059981892ad09e04f154b1",
+      "license": "MIT AND LicenseRef-Langfuse-EE"
+    },
+    {
+      "role": "worker",
+      "repository": "docker.langfuse.com/langfuse/langfuse-worker",
+      "version": "4.78.0",
+      "digest": "sha256:74c8020966a9556b25c21e368b64c9cfe24e1df1c4f76569aee6d230c9443de5",
+      "index_digest": "sha256:175a32200b9908b283104e67b84d080381e841daa8ee6692f5bb26538df1a59e",
+      "created_at": "2026-11-10T13:21:36.944825705Z",
+      "source_revision": "138beceb728b998003059981892ad09e04f154b1",
+      "license": "MIT AND LicenseRef-Langfuse-EE"
+    },
+    {
+      "role": "clickhouse",
+      "repository": "docker.io/clickhouse/clickhouse-server",
+      "version": "26.3.62.3",
+      "digest": "sha256:6eb24df16477b65c87b772a56eb341a9624529491856c103e74c537db59669f1",
+      "index_digest": "sha256:de3e47c64078aa196dae2349e048fc98ba81947f651f5c20e06e46baea8ae40a",
+      "created_at": "2026-10-26T15:06:17.347793949Z",
+      "license": "Apache-2.0"
+    },
+    {
+      "role": "valkey",
+      "repository": "docker.io/valkey/valkey",
+      "version": "8.0.6",
+      "digest": "sha256:af6bd637c1f61c18a50ea9a82aaae5d00a65b69daeea4c36370e52513b529721",
+      "index_digest": "sha256:0065f9ccc082e848ac3c061864c72173070d5b6f835270b5208a1e84cbdfc7d9",
+      "created_at": "2026-02-18T19:00:03.33285655Z",
+      "license": "BSD-3-Clause",
+      "identity_evidence": {
+        "uid": 999,
+        "gid": 999,
+        "layer": "sha256:d72afee9d27993708eab9415c50db1e4c8cf02e252583144641c07175f3dcadb",
+        "paths": [
+          "etc/passwd",
+          "etc/group"
+        ]
+      }
+    }
+  ],
+  "architecture": "linux/amd64",
+  "tools": {
+    "pulumi": "3.273.0",
+    "aws_provider": "7.52.1",
+    "kubernetes_provider": "4.34.2",
+    "python": "3.12"
+  },
+  "rds": {
+    "engine": "postgres",
+    "version": "15.18",
+    "source": "Inherited reviewed Dify pinned RDS version; region availability must be verified before apply"
+  },
+  "rds_ca": {
+    "url": "https://truststore.pki.rds.amazonaws.com/us-east-2/us-east-2-bundle.pem",
+    "sha256": "d46e1bdfda05c8e7644e50930806a19b139a222542bf0348082fb59ece2b5fa5"
+  },
+  "release_age_policy": "Selected application/chart/image builds and wheel releases are at least four days old as of 2026-11-15; no waiver used",
+  "authored_license": "pending owner decision",
+  "provider_plugins": [
+    {
+      "provider": "aws",
+      "date": "2026-10-28T14:52:30Z",
+      "assets": [
+        {
+          "name": "pulumi-aws_7.52.1_checksums.txt",
+          "url": "https://github.com/pulumi/pulumi-aws/releases/download/v7.52.1/pulumi-aws_7.52.1_checksums.txt",
+          "digest": "sha256:8be82022258a646741d4558d2117ac07e462d4b637e034498a22d089035065cf"
+        },
+        {
+          "name": "pulumi-resource-aws-v7.52.1-linux-amd64.tar.gz",
+          "url": "https://github.com/pulumi/pulumi-aws/releases/download/v7.52.1/pulumi-resource-aws-v7.52.1-linux-amd64.tar.gz",
+          "digest": "sha256:2e705824a2103dd6e3dc66744ba2d55cad55d665476b3ffcd8ce024cf4cab081"
+        },
+        {
+          "name": "pulumi-resource-aws-v7.52.1-linux-arm64.tar.gz",
+          "url": "https://github.com/pulumi/pulumi-aws/releases/download/v7.52.1/pulumi-resource-aws-v7.52.1-linux-arm64.tar.gz",
+          "digest": "sha256:1976366b71dc08d8827a04fbb8eaf50a0d1ec5757726e593b6d7c27e7636daf8"
+        }
+      ]
+    },
+    {
+      "provider": "kubernetes",
+      "date": "2026-09-21T18:10:07Z",
+      "assets": [
+        {
+          "name": "pulumi-kubernetes_4.34.2_checksums.txt",
+          "url": "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.34.2/pulumi-kubernetes_4.34.2_checksums.txt",
+          "digest": "sha256:368411fbba3452a6eaf48a2cfcc9e386e59c7f1de2341faf7a161c116ec2d903"
+        },
+        {
+          "name": "pulumi-resource-kubernetes-v4.34.2-linux-amd64.tar.gz",
+          "url": "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.34.2/pulumi-resource-kubernetes-v4.34.2-linux-amd64.tar.gz",
+          "digest": "sha256:b2a3471a897d8d4aa5c6f0ea2933d363dfa72bee8ed651a16246a09e3e728bb6"
+        },
+        {
+          "name": "pulumi-resource-kubernetes-v4.34.2-linux-arm64.tar.gz",
+          "url": "https://github.com/pulumi/pulumi-kubernetes/releases/download/v4.34.2/pulumi-resource-kubernetes-v4.34.2-linux-arm64.tar.gz",
+          "digest": "sha256:1456c1f9624c4cd68caf03928d4c34d6807cbe668fd917c6220ecc09eab70d26"
+        }
+      ]
+    }
+  ],
+  "wheel_extension_provenance": "Original Dify versions retained. Added only canonical PyPI AMD64/native wheel hashes; no dependency resolution or installation performed."
+}
