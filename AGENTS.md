@@ -16,5 +16,4 @@ two-span observations, numeric score subject/value, and missing/wrong credential
 denial. Health checks and synthetic parser tests do not establish that outcome.
 No HA, recovery or scaling result is claimed without direct evidence.
 
-Keep the authored-code license and maintenance status honest. Preserve upstream
-notices. A source handoff does not authorize deployment, spending or publication.
+Preserve the authored-code MIT License and upstream notices. A source handoff does not authorize deployment, spending or publication.

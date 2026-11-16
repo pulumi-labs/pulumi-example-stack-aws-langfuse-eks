@@ -12,8 +12,7 @@ uploads passed. Teardown deleted 29 resources; independent inventory confirmed
 no owned database, backups, snapshots, bucket, IAM role/policies, security group,
 database subnet/parameter groups, namespace, claims, persistent volumes or EBS
 volumes remained. Shared infrastructure was preserved. HA, scaling and recovery
-remain untested. Authored-code licensing and maintenance ownership are pending;
-keep this source private until those decisions are complete.
+remain untested.
 
 ## What this creates
 
@@ -261,10 +260,10 @@ Langfuse's MIT core excludes its separately licensed enterprise directories.
 Official images include EE material; no enterprise license or feature is enabled
 here. Preserve the notices in `licenses/`. Chart is MIT, ClickHouse Apache-2.0,
 and Valkey BSD-3-Clause. Their bundled dependencies retain their own licenses.
-The authored example license and public maintenance/support route must be
-settled by the owner before publication.
+This example's authored code is licensed under the [MIT License](LICENSE) and
+is provided as-is, without warranty or a support commitment. Third-party
+components retain their own licenses and notices.
 
 During private review, use this repository's Issues for support and contribution
 proposals. Do not include credentials, state or private logs. For sensitive
-reports, contact the organization administrators privately; no public security
-reporting channel or maintenance commitment has been established.
+reports, contact the organization administrators privately.
