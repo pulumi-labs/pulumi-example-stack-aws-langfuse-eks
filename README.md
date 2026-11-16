@@ -1,73 +1,116 @@
 # Private Langfuse tracing on AWS EKS with Python Pulumi
 
-Deploy Langfuse web and worker on an existing EKS cluster, with RDS PostgreSQL,
-S3, and persistent single-node ClickHouse and Valkey. The included Python
-application emits a deterministic two-span trace, attaches a score, and
-retrieves the exact stored result through authenticated v4 APIs.
+This example deploys Langfuse, an open source tool for recording and inspecting
+LLM application traces, inside a Kubernetes cluster you already run in AWS.
+Pulumi (infrastructure as code written in Python) creates the databases,
+storage and app. A small included Python script then sends a test trace and
+reads it back to prove the whole pipeline works.
 
-Validated on November 15, 2026 in a disposable private AWS deployment:
-refreshed preview, deployment, nine fixture tests, exact two-span ingestion and
-retrieval, numeric score 1, six denied authentication requests, and S3 event
-uploads passed. Teardown deleted 29 resources; independent inventory confirmed
-no owned database, backups, snapshots, bucket, IAM role/policies, security group,
-database subnet/parameter groups, namespace, claims, persistent volumes or EBS
-volumes remained. Shared infrastructure was preserved. HA, scaling and recovery
-remain untested.
+## What you'll build
 
-## What this creates
+- A private Langfuse install (web app plus background worker) in its own
+  Kubernetes namespace.
+- The storage Langfuse needs: a PostgreSQL database, an S3 bucket, ClickHouse
+  (an analytics database for trace data) and Valkey (an in-memory queue and
+  cache).
+- A ready-to-use admin account, organization, project and API keys.
+- A test script, `trace_demo.py`, that sends a two-step trace with a score and
+  confirms Langfuse stored exactly that.
+
+A few terms you'll see throughout:
+
+- **EKS** (Amazon Elastic Kubernetes Service) is AWS's managed Kubernetes. This
+  example runs inside an EKS cluster you already have. It doesn't create one.
+- **RDS** (Amazon Relational Database Service) is AWS's managed database. It
+  hosts Langfuse's PostgreSQL database here.
+- **IRSA** (IAM Roles for Service Accounts) lets a Kubernetes pod use an AWS
+  role through short-lived credentials, so no AWS keys are stored in the
+  cluster.
+- **OIDC** (OpenID Connect) is an identity standard. EKS uses an OIDC provider
+  to vouch for pods when they request IRSA credentials.
+- **Helm** is the Kubernetes package manager. A Helm "chart" is a packaged app.
+  This example installs the official Langfuse chart.
+- **PVC** (PersistentVolumeClaim) is a request for a Kubernetes disk. Here
+  those disks are AWS EBS volumes.
+- A **trace** is one recorded run of an LLM app, and a **span** is one step
+  inside it.
+
+## Validation status (November 15, 2026)
+
+This example was deployed in a disposable private AWS environment, and these
+checks passed: a refreshed preview, the deployment itself, nine fixture tests,
+exact ingestion and retrieval of the two-span trace, the numeric score `1`,
+denial of six requests with bad credentials, and S3 event uploads.
+
+Teardown deleted 29 resources. A separate inventory confirmed that no owned
+database, backups, snapshots, bucket, IAM role or policies, security group,
+database subnet or parameter groups, namespace, claims, persistent volumes or
+EBS volumes were left behind. Shared infrastructure was preserved.
+
+High availability (HA), scaling and recovery have **not** been tested.
+
+## What gets created
 
 - One private namespace with the official Langfuse Helm release.
 - One encrypted private RDS PostgreSQL 15.18 database, 20Gi gp3, db.t4g.small.
-- One private encrypted S3 bucket for events, media and exports, accessed through
-  a bucket-scoped IAM role and projected EKS OIDC token.
-- One 20Gi ClickHouse PVC and one 5Gi Valkey PVC, with private services.
-- A real administrator, organization, project and API keys through Langfuse's
-  supported headless startup initialization.
+- One private, encrypted S3 bucket for events, media and exports. Langfuse
+  reaches it through an IAM role limited to that bucket, using IRSA.
+- One 20Gi ClickHouse PVC and one 5Gi Valkey PVC, each with a private service.
+- A real administrator, organization, project and API keys, created by
+  Langfuse's supported headless (no-click) startup setup.
 
-The chart uses its external-store interface, so this example needs no
-ClickHouse operator, Keeper, cert-manager, Tailscale, ingress controller or CI.
-Single-container ClickHouse is upstream's community development option.
-There is no HA, backup/restore implementation, performance or production
-readiness claim. Web and worker have separate Deployments; independent scaling
-is available in the chart but has not been tested here.
+The chart connects to these as external stores, so you don't need a ClickHouse
+operator, Keeper, cert-manager, Tailscale, an ingress controller or CI. The
+single-container ClickHouse is upstream's community development option. Web
+and worker run as separate Deployments, so the chart can scale them
+independently, but that hasn't been tested here. There's no HA, backup and
+restore setup, performance claim or production readiness claim.
 
-No EKS cluster, runner, VPC, node group, OIDC provider or CSI driver is created.
-All application services use ClusterIP. Operator access uses an authenticated
-Kubernetes port-forward to loopback and then Langfuse login/API authentication.
+The stack doesn't create an EKS cluster, runner, VPC, node group, OIDC provider
+or CSI driver. Every app service is ClusterIP (reachable only inside the
+cluster). You reach Langfuse through an authenticated `kubectl port-forward` to
+your own machine, then sign in or use API keys.
 
-## Prerequisites
+## Before you start
 
-Use an existing AWS account and EKS cluster in `us-east-2`, with Linux AMD64
-nodes, a selected managed node group, normal VPC CNI networking, an existing
-EKS IAM OIDC provider, and EBS CSI storage with a Delete reclaim policy.
-Supply two private RDS subnets in distinct availability zones, the cluster VPC,
-and the security group used by the selected nodes. Pods using security groups
-for pods require a corresponding deliberate RDS rule change.
+You'll need these already in place:
 
-The approved execution machine must reach the private Kubernetes API and AWS
-APIs, registries and DNS. Its existing short-lived provisioning identity needs
-the AWS resource and Kubernetes namespace privileges represented by this
-program. It must have reviewed Python 3.12, uv, AWS CLI, kubectl and Pulumi
-3.273.0, plus AWS provider 7.52.1 and Kubernetes provider 4.34.2.
-Prefer preinstalled, scanned tools; this source does not install tools.
+1. **An AWS account and EKS cluster** in `us-east-2` with Linux AMD64 nodes, a
+   managed node group you can target, standard VPC CNI networking, an IAM OIDC
+   provider for the cluster, and EBS CSI storage with a `Delete` reclaim policy.
+2. **Network inputs:** two private subnets for RDS in different availability
+   zones, the cluster's VPC, and the security group your selected nodes use. If
+   your pods use security groups for pods, change the RDS rule to match on
+   purpose.
+3. **A machine to run the commands** that can reach the cluster's private
+   Kubernetes API, AWS APIs, container registries and DNS. Its short-lived AWS
+   identity needs permission to create the AWS resources and namespace in this
+   program.
+4. **Tools on that machine:** Python 3.12, uv, AWS CLI, kubectl and Pulumi
+   3.273.0, plus the Pulumi AWS provider 7.52.1 and Kubernetes provider 4.34.2.
+   This repository doesn't install tools for you. Prefer copies you've already
+   installed and scanned.
 
-Scan the exact Python wheels, provider binaries, chart archive, image manifests
-and all layers before executing them. Use an approved sandbox for installs,
-preview and workload checks. Do not run downloaded code or this program on an
-unisolated workstation. A vulnerability audit is not a malware scan.
+**Safety first:** malware-scan the exact Python wheels, provider binaries,
+chart archive, container image manifests and all image layers before running
+them. Do installs, previews and the test script in an isolated sandbox, never
+on your everyday workstation. A vulnerability audit is not a malware scan.
 
-Clone the private repository with an account that has access:
+## Step 1: Get the code
+
+Clone the repository:
 
 ```sh
 git clone https://github.com/pulumi-labs/pulumi-example-stack-aws-langfuse-eks.git
 cd pulumi-example-stack-aws-langfuse-eks
 ```
 
-Use an approved execution environment for the commands below.
+Run every command below in your isolated environment.
 
-## Prepare the reviewed artifacts
+## Step 2: Download and verify the chart
 
-In the approved execution environment, acquire the chart as inert data:
+Download the Helm chart as a plain file and check its SHA-256 hash. Don't
+install anything yet:
 
 ```sh
 mkdir -p .artifacts
@@ -79,8 +122,13 @@ printf '%s  %s\n' \
   .artifacts/langfuse-2.2.4.tgz | sha256sum -c -
 ```
 
-After complete malware coverage of that archive and the exact wheelhouse and
-plugins, create the environment using the already installed Python:
+**Success:** `sha256sum` prints `OK`.
+
+## Step 3: Install Python dependencies
+
+After you've malware-scanned the chart archive, the full wheelhouse (a folder
+of downloaded Python wheels) and the provider plugins, create the virtual
+environment using the Python you already have installed:
 
 ```sh
 : "${REVIEWED_WHEELHOUSE:?Set the complete scanned wheelhouse directory}"
@@ -90,17 +138,17 @@ uv pip sync --python .venv/bin/python --no-index \
   --only-binary :all: requirements.lock
 ```
 
-The runtime lock reuses the reviewed Pulumi/AWS/Kubernetes closure and adds a
-small pinned Pydantic response parser. Hashes cover CPython 3.12 Linux ARM64 and
-AMD64 wheels where native wheels are required. Application nodes are AMD64.
-The exact runtime image manifests are in `pins.py`. Do not replace them with
-floating tags. New or regenerated runnable outputs require scanning before use.
+The lock pins Pulumi, the AWS and Kubernetes providers, and a small Pydantic
+response parser. Hashes cover CPython 3.12 Linux ARM64 and AMD64 wheels where
+native code is involved. The cluster nodes run AMD64. The exact container image
+digests live in `pins.py`. Don't swap them for floating tags, and scan anything
+you regenerate before you use it.
 
-## Configure
+## Step 4: Configure the stack
 
-Use a secrets backend you control and keep its encryption key outside the
-repository. Set the following shell variables from the verified platform
-inventory, then configure the stack:
+Use a Pulumi secrets backend you control, and keep its encryption key outside
+this repository. Set the shell variables from your real platform details, then
+create a stack (one deployment of this project) and configure it:
 
 ```sh
 : "${ACCOUNT_ID:?}" "${CLUSTER_NAME:?}" "${VPC_ID:?}"
@@ -117,15 +165,23 @@ pulumi config set storageClass "$STORAGE_CLASS"
 pulumi config set adminEmail
 ```
 
-`adminEmail` prompts for the initial administrator email. The default AWS
-resource prefix and namespace are `langfuse-<stack>`. To scope a trial identity,
-set `resourcePrefix` to a unique lowercase DNS label, such as `ae4-langfuse`.
-Database, subnet/parameter/security groups, IAM role and bucket prefix all use
-it. Provider tags include `pulumi-project`, `pulumi-stack` and `resource-prefix`.
-An optional `permissionsBoundaryArn` applies only to the application IAM role.
-Neither trial prefixes nor a trial permissions boundary are product requirements.
+The last command prompts you for the first admin's email address.
 
-Generate and store new secrets without printing them:
+### Optional settings
+
+- `resourcePrefix` changes the AWS name prefix and namespace, which default to
+  `langfuse-<stack>`. Use a unique lowercase DNS label, such as
+  `ae4-langfuse`. The database, subnet, parameter and security groups, IAM role
+  and bucket prefix all use it.
+- `permissionsBoundaryArn` attaches an IAM permissions boundary to the
+  application role only.
+
+Neither is required. Resources are tagged with `pulumi-project`,
+`pulumi-stack` and `resource-prefix`.
+
+## Step 5: Generate secrets
+
+This generates fresh secrets and stores them encrypted, without printing them:
 
 ```sh
 for key in databasePassword queuePassword clickhousePassword adminPassword salt sessionSecret encryptionKey
@@ -136,21 +192,25 @@ pulumi config set projectPublicKey "pk-lf-$(openssl rand -hex 32)"
 printf 'sk-lf-%s' "$(openssl rand -hex 32)" | pulumi config set --secret projectSecretKey
 ```
 
-Ordinary secrets accept 32..128 URL-safe characters. The encryption key must
-be 64 lowercase hexadecimal characters; project keys need `pk-lf-` / `sk-lf-`
-prefixes followed by 32..128 URL-safe characters. Never enable shell tracing
-while handling secrets. Store the generated administrator password securely
-outside source control before using it.
+The rules, if you supply your own values instead:
 
-Startup initializes the project and account without requiring the sample
-application. Headless initialization is creation-only: changing its environment
-variables does not rotate existing Langfuse API keys or administrator passwords.
-Rotate those in product settings. Changes to referenced Kubernetes Secrets also
-need an attended rollout of their consumers.
+- Ordinary secrets: 32..128 URL-safe characters.
+- `encryptionKey`: exactly 64 lowercase hexadecimal characters.
+- Project keys: `pk-lf-` or `sk-lf-` followed by 32..128 URL-safe characters.
 
-## Deploy and use
+Never turn on shell tracing (`set -x`) while handling secrets. Save the admin
+password somewhere safe, outside source control, before you use it.
 
-Inspect the exact saved preview before applying:
+Langfuse creates the project and admin account at startup, with or without the
+test script. That setup only runs once: changing these values later won't
+rotate existing API keys or the admin password. Rotate those in Langfuse's
+settings. If you change a Kubernetes Secret the app reads, restart the pods
+that use it yourself.
+
+## Step 6: Preview and deploy
+
+Save a preview plan, read it, then apply exactly that plan. After it finishes,
+open a port-forward to the web app:
 
 ```sh
 pulumi preview --save-plan deployment.plan
@@ -159,13 +219,21 @@ kubectl -n "$(pulumi stack output namespace)" \
   port-forward service/langfuse-web 3000:3000 --address 127.0.0.1
 ```
 
-Keep that port-forward open in its terminal. Open `http://localhost:3000` and log
-in with the configured administrator. Signup is disabled. Browser media uploads
-use S3 presigned URLs with CORS restricted to this local origin. PostgreSQL uses
-the bundled regional CA and `verify-full`; S3 uses HTTPS. Cluster-private
-ClickHouse/Valkey connections are password-authenticated plaintext.
+Leave that port-forward running in its own terminal.
 
-In another terminal in the same reviewed directory:
+## Step 7: Sign in
+
+Open `http://localhost:3000` and sign in with the admin email and password you
+configured. Sign-up is turned off.
+
+Under the hood: browser media uploads use S3 presigned URLs, with CORS limited
+to this local address. PostgreSQL uses the bundled regional CA with
+`verify-full`, and S3 uses HTTPS. ClickHouse and Valkey traffic stays inside the
+cluster, uses passwords, and isn't encrypted.
+
+## Step 8: Run the trace test
+
+In a second terminal, in the same directory:
 
 ```sh
 export LANGFUSE_PUBLIC_KEY="$(pulumi config get projectPublicKey)"
@@ -175,95 +243,117 @@ export TRACE_RUN_ID="$(openssl rand -hex 16)"
 unset LANGFUSE_SECRET_KEY LANGFUSE_PUBLIC_KEY TRACE_RUN_ID
 ```
 
-The client always connects to `127.0.0.1:3000`, does not use proxy environment
-variables or follow redirects, and makes no LLM call. A fresh run token produces
-deterministic trace/span/score IDs. It requires an empty trace ID before sending
-and waits up to 180 seconds for exact persisted output.
+The script always talks to `127.0.0.1:3000`. It ignores proxy environment
+variables, doesn't follow redirects and makes no LLM calls. Each fresh
+`TRACE_RUN_ID` produces predictable trace, span and score IDs. The script first
+checks that the trace ID isn't already used, then sends the trace and waits up
+to 180 seconds for the exact stored result.
 
-Success prints `status=passed` as JSON, the public IDs, score `1`, and six denied
-requests. The two spans must be `answer` and its child `retrieve`, with the
-expected input/output, environment and trace name. It verifies the v3 score
-subject identifies the same trace. Missing and wrong project credentials must
-receive HTTP 401 for observation reads, score reads and OTLP writes.
+**Success** looks like JSON with `status=passed`, the public IDs, score `1` and
+six denied requests. Behind that, the script checks that:
 
-This proves more than HTTP acceptance: the worker must process the queue and
-write the result before retrieval succeeds. OTLP partial acceptance fails the
-check. v4 observations and v3 scores are used because older trace/score readers
-are unavailable in events-only mode.
+- The two spans are `answer` and its child `retrieve`, with the expected input,
+  output, environment and trace name.
+- The v3 score points at the same trace.
+- Missing and wrong project credentials get HTTP 401 for observation reads,
+  score reads and OTLP (OpenTelemetry) writes.
 
-## Troubleshooting and limits
+This proves more than "the server said OK". The worker has to pull the job off
+the queue and write the result before the script can read it back. A partial
+OTLP acceptance counts as a failure. The script uses v4 observations and v3
+scores because the older trace and score readers aren't available in
+events-only mode.
 
-Pending pods usually mean the selected node group lacks capacity, the AMD64
-selector differs, or the CSI class cannot bind. Requests total roughly 2.1 CPU
-and 4.125Gi RAM before platform overhead and rollout surge; limits total 6.5 CPU
-and 12.5Gi. One m6i.xlarge is a small trial pool, not a capacity guarantee.
+## Troubleshooting
 
-Database connection failures require checking the actual node/pod SG path,
-subnet routing, native startup logs and the unchanged RDS CA. Never disable
-certificate verification to get past a startup failure. Migration logs can
-contain operational detail; retain sanitized evidence outside the repository.
+- **Pods stuck in Pending:** the node group probably lacks capacity, the AMD64
+  node selector doesn't match, or the storage class can't create disks.
+  Requests total about 2.1 CPU and 4.125Gi RAM before platform overhead and
+  rollout surge. Limits total 6.5 CPU and 12.5Gi. One m6i.xlarge node is a
+  small trial pool, not a capacity guarantee.
+- **Database connection failures:** check the node or pod security group path,
+  subnet routing, startup logs and the unchanged RDS CA. Never turn off
+  certificate checks to get past a startup error. Migration logs can contain
+  operational detail, so keep cleaned-up copies outside the repository.
+- **Pods running but no data:** worker liveness uses the release's
+  process-only `/` route. Its `/api/health` also checks PostgreSQL and Redis
+  and could restart healthy workers during a dependency outage. The pinned
+  chart has no worker readiness probe. Healthy pods don't prove ingestion
+  works, so run the trace test.
 
-Worker liveness uses the release's process-only `/` route. Its `/api/health`
-also checks PostgreSQL and Redis and can restart healthy workers on dependency
-outages. The pinned chart has no worker readiness probe. A successful pod count
-is not proof of completed ingestion; run the Python outcome.
+## Limits
 
-The example does not promise mail delivery, enterprise-only capabilities,
-multi-replica availability, recovery, or performance. Ordinary optional product
-integrations still need their own credentials and infrastructure.
+There's no promise of email delivery, enterprise-only features, multiple
+replicas, recovery or performance. Optional product integrations need their own
+credentials and infrastructure.
 
-## Costs and cleanup
+## Costs
 
-EKS and node charges continue independently of this stack. Account for RDS
-hourly and storage charges, 25Gi of application EBS, S3 requests/storage and
-existing NAT/data transfer. Reconcile actual spend and the cleanup reserve
-before apply; no precise total has been measured for this source.
+Your EKS cluster and nodes cost money whether or not this stack exists. On top
+of that, budget for RDS hourly and storage charges, 25Gi of EBS for the app, S3
+requests and storage, and existing NAT and data transfer. Check your actual
+spend and leave room for cleanup before you deploy. No precise total has been
+measured.
 
-Data protection is enabled by default. RDS keeps seven days of backups and takes
-a final snapshot on an intentional destructive teardown. Bucket/PVC/RDS Pulumi
-protection prevents accidental destroy, and a nonempty bucket will not auto-empty.
-This is retention protection, not a coherent backup or tested restore.
+## Cleanup
 
-For a synthetic deploy-and-delete trial, set this before the first preview:
+Data protection is on by default. RDS keeps seven days of backups and takes a
+final snapshot if you deliberately destroy it. Pulumi protection on the bucket,
+PVCs and RDS blocks accidental deletion, and a nonempty bucket won't empty
+itself. This protects your data from deletion. It isn't a consistent backup,
+and restoring hasn't been tested.
+
+**For a throwaway trial,** set this before your first preview:
 
 ```sh
 pulumi config set disposable true
 ```
 
-That explicit mode removes data protection, enables bucket emptying and requests
-no final RDS snapshot or retained automated backups. Finish by stopping the
-port-forward and running:
+That turns off data protection, lets Pulumi empty the bucket, and skips the
+final RDS snapshot and retained automated backups. When you're done, stop the
+port-forward and run:
 
 ```sh
 pulumi destroy
 ```
 
-For an existing protected deployment, first decide what data to retain and
-export it through the product. Switching `disposable` to true is an irreversible
-data-destruction decision when followed by destroy; review its preview.
-Do not delete the existing EKS foundation. Independently reconcile the stack's
-RDS instances, snapshots/backups, S3 objects/multipart uploads, PVC/PV/EBS volumes,
-IAM role/policy and namespace after cleanup, preserving encrypted state until
-that inventory is complete.
+**For a deployment you care about,** decide what data to keep and export it
+through Langfuse first. Switching `disposable` to true and then destroying
+deletes the data for good, so read that preview carefully. Never delete the
+existing EKS cluster or its foundation.
 
-## Attribution and maintenance
+After cleanup, check by hand that the stack's RDS instances, snapshots and
+backups, S3 objects and multipart uploads, PVCs, PVs and EBS volumes, IAM role
+and policy, and namespace are gone. Keep your encrypted Pulumi state until
+that check is complete.
 
-References: [Langfuse Helm](https://langfuse.com/self-hosting/deployment/kubernetes-helm),
-[headless initialization](https://langfuse.com/self-hosting/administration/headless-initialization),
-[ClickHouse support](https://langfuse.com/self-hosting/deployment/infrastructure/clickhouse),
-[v4 changes](https://langfuse.com/self-hosting/upgrade/upgrade-guides/upgrade-v3-to-v4),
-and [OpenTelemetry ingestion](https://langfuse.com/docs/observability/get-started).
+## How this differs from other examples
 
-`llm-powerhouse` already includes a Pulumi AWS ECS Langfuse implementation;
-this example focuses on private EKS ingestion rather than a GPU inference stack.
-Langfuse's MIT core excludes its separately licensed enterprise directories.
-Official images include EE material; no enterprise license or feature is enabled
-here. Preserve the notices in `licenses/`. Chart is MIT, ClickHouse Apache-2.0,
-and Valkey BSD-3-Clause. Their bundled dependencies retain their own licenses.
+`llm-powerhouse` already includes a Pulumi AWS ECS Langfuse setup. This example
+focuses on private EKS ingestion instead of a GPU inference stack.
+
+## License and attribution
+
 This example's authored code is licensed under the [MIT License](LICENSE) and
 is provided as-is, without warranty or a support commitment. Third-party
-components retain their own licenses and notices.
+components keep their own licenses and notices, preserved in `licenses/`:
 
-During private review, use this repository's Issues for support and contribution
-proposals. Do not include credentials, state or private logs. For sensitive
+- Langfuse's core is MIT, but its enterprise directories are licensed
+  separately. The official images include enterprise material. No enterprise
+  license or feature is enabled here.
+- The Langfuse chart is MIT, ClickHouse is Apache-2.0 and Valkey is
+  BSD-3-Clause. Their bundled dependencies keep their own licenses.
+
+## Support and contributing
+
+Use this repository's Issues for questions, bug reports and contribution ideas.
+Never include credentials, state or private logs. For sensitive security
 reports, contact the organization administrators privately.
+
+## References
+
+- [Langfuse Helm](https://langfuse.com/self-hosting/deployment/kubernetes-helm)
+- [Headless initialization](https://langfuse.com/self-hosting/administration/headless-initialization)
+- [ClickHouse support](https://langfuse.com/self-hosting/deployment/infrastructure/clickhouse)
+- [v4 changes](https://langfuse.com/self-hosting/upgrade/upgrade-guides/upgrade-v3-to-v4)
+- [OpenTelemetry ingestion](https://langfuse.com/docs/observability/get-started)
