@@ -35,20 +35,6 @@ A few terms you'll see throughout:
 - A **trace** is one recorded run of an LLM app, and a **span** is one step
   inside it.
 
-## Validation status (November 15, 2026)
-
-This example was deployed in a disposable private AWS environment, and these
-checks passed: a refreshed preview, the deployment itself, nine fixture tests,
-exact ingestion and retrieval of the two-span trace, the numeric score `1`,
-denial of six requests with bad credentials, and S3 event uploads.
-
-Teardown deleted 29 resources. A separate inventory confirmed that no owned
-database, backups, snapshots, bucket, IAM role or policies, security group,
-database subnet or parameter groups, namespace, claims, persistent volumes or
-EBS volumes were left behind. Shared infrastructure was preserved.
-
-High availability (HA), scaling and recovery have **not** been tested.
-
 ## What gets created
 
 - One private namespace with the official Langfuse Helm release.
@@ -63,8 +49,8 @@ The chart connects to these as external stores, so you don't need a ClickHouse
 operator, Keeper, cert-manager, Tailscale, an ingress controller or CI. The
 single-container ClickHouse is upstream's community development option. Web
 and worker run as separate Deployments, so the chart can scale them
-independently, but that hasn't been tested here. There's no HA, backup and
-restore setup, performance claim or production readiness claim.
+independently. This example uses single-node storage and does not include an
+HA deployment or backup-and-restore setup.
 
 The stack doesn't create an EKS cluster, runner, VPC, node group, OIDC provider
 or CSI driver. Every app service is ClusterIP (reachable only inside the
@@ -300,8 +286,7 @@ measured.
 Data protection is on by default. RDS keeps seven days of backups and takes a
 final snapshot if you deliberately destroy it. Pulumi protection on the bucket,
 PVCs and RDS blocks accidental deletion, and a nonempty bucket won't empty
-itself. This protects your data from deletion. It isn't a consistent backup,
-and restoring hasn't been tested.
+itself. This protects your data from deletion; it is not a consistent backup.
 
 **For a throwaway trial,** set this before your first preview:
 
